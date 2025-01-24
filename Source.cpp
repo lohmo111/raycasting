@@ -1,6 +1,6 @@
 #include <SFML/Graphics.hpp>
 #include "Player.h"
-//#include "Ray.h"
+#include "Wall.h"
 #include <list>
 #include <stdio.h>
 #include <math.h>
@@ -65,133 +65,185 @@ void intersect(double a1, double a2, double b1, double b2, double c1, double c2,
     x = (b1 * c2 - b2 * c1) / det;
     y = (a2 * c1 - a1 * c2) / det;
 }
-int main()
-{
-    // create the window
-    sf::RenderWindow window(sf::VideoMode(800, 600), "My window");
+
+// Функция нахождения пересечения двух отрезков
+bool intersect_segments(sf::Vector2f p1, sf::Vector2f p2, sf::Vector2f q1, sf::Vector2f q2, sf::Vector2f& intersect) {
+    float denom = (p2.x - p1.x) * (q2.y - q1.y) - (p2.y - p1.y) * (q2.x - q1.x);
+
+    // Если детерминант равен нулю, отрезки параллельны
+    if (denom == 0) {
+        return false;
+    }
+
+    float t = ((q1.x - p1.x) * (q2.y - q1.y) - (q1.y - p1.y) * (q2.x - q1.x)) / denom;
+    float u = ((q1.x - p1.x) * (p2.y - p1.y) - (q1.y - p1.y) * (p2.x - p1.x)) / denom;
+
+    // Если t и u лежат между 0 и 1, значит отрезки пересекаются
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+        intersect.x = p1.x + t * (p2.x - p1.x);
+        intersect.y = p1.y + t * (p2.y - p1.y);
+        return true;
+    }
+
+    return false;
+}
+
+
+float anglel(float ang) {
+    ang = fabs(360 - ang);
+    return ang * 3.14159265 / 180;
+}
+
+int main() {
+    // Создаем окно
+    sf::RenderWindow window(sf::VideoMode(900, 900), "My window");
     window.setFramerateLimit(120);
-    sf::RenderWindow window_3d(sf::VideoMode(800, 600), "My window");
+
+    sf::RenderWindow window_3d(sf::VideoMode(1200, 600), "3D View");
     window_3d.setFramerateLimit(120);
-    // init class examples
+
+    // Инициализация игрока
     Player player;
     sf::RectangleShape FenceRect;
-    //// init new vars and containers
-    sf::Vector2f velosity(0,0);
+
+    // Инициализация новых переменных и контейнеров
+    sf::Vector2f velocity(0, 0);
     float s = 300.f;
     float angle = 2.f;
     double x = 0, y = 0;
 
-    //LIST WITH RAYS??
+    // Генерация лабиринта
+    //std::vector<std::pair<sf::Vector2f, sf::Vector2f>> walls = generate_maze(800, 600, 40);
+    std::vector<Wall> walls = {
+        // Внешние границы лабиринта
+        Wall({50, 50}, {750, 50}),   // Верхняя граница
+        Wall({50, 50}, {50, 750}),   // Левая граница
+        Wall({750, 50}, {750, 750}), // Правая граница
+        Wall({50, 750}, {750, 750}), // Нижняя граница
 
-    sf::Vertex fence[] =
-    {
-        sf::Vertex(sf::Vector2f(150, 150)),
-        sf::Vertex(sf::Vector2f(200, 200))
+        // Лабиринт с центральным проходом и ответвлениями
+        Wall({200, 50}, {200, 250}),   // Вертикальная левая часть
+        Wall({200, 250}, {300, 250}),  // Горизонтальная левая часть
+        Wall({300, 250}, {300, 150}),  // Вертикальная центральная часть сверху
+        Wall({300, 150}, {400, 150}),  // Горизонтальная центральная часть
+        Wall({400, 150}, {400, 250}),  // Вертикальная центральная правая часть
+        Wall({400, 250}, {550, 250}),  // Горизонтальная правая часть сверху
+        Wall({550, 250}, {550, 400}),  // Вертикальная правая часть
+        Wall({550, 400}, {450, 400}),  // Горизонтальная нижняя часть справа
+        Wall({450, 400}, {450, 500}),  // Вертикальная центральная часть снизу
+        Wall({450, 500}, {300, 500}),  // Горизонтальная центральная часть снизу
+        Wall({300, 500}, {300, 400}),  // Вертикальная левая часть снизу
+        Wall({300, 400}, {150, 400}),  // Горизонтальная левая часть снизу
+        Wall({150, 400}, {150, 600}),  // Вертикальная левая часть центра
+        Wall({150, 600}, {350, 600}),  // Горизонтальная центральная часть снизу
+        Wall({350, 600}, {350, 700}),  // Вертикальная центральная часть снизу
+        Wall({350, 700}, {600, 700}),  // Горизонтальная нижняя правая часть
+        Wall({600, 700}, {600, 600}),  // Вертикальная правая нижняя часть
+        Wall({600, 600}, {450, 600}),  // Горизонтальная правая часть
+        Wall({450, 600}, {450, 550}),  // Вертикальная правая нижняя часть
     };
 
-    sf::Vertex fence1[] =
-    {
-        sf::Vertex(sf::Vector2f(250, 250)),
-        sf::Vertex(sf::Vector2f(400, 400))
-    };
 
-    while (window.isOpen())
-    {
-        // check all the window's events that were triggered since the last iteration of the loop
+
+
+
+    while (window_3d.isOpen()) {
+        window.clear(sf::Color::Black);
+        window_3d.clear(sf::Color::Black);
+
         sf::Event event;
-        while (window.pollEvent(event))
-        {
-            switch (event.type)
-            {
-            case sf::Event::Closed:
-                window.close();
+        while (window_3d.pollEvent(event)) {
+            if (event.type == sf::Event::Closed) {
+                window_3d.close();
             }
         }
-        //movement along the x axis
+
+        // Движение и поворот
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) {
-            velosity.x = -1;
+            velocity.x = -1;
         }
         else if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) {
-            velosity.x = 1;
+            velocity.x = 1;
         }
-        else
-            velosity.x = 0;
-        // movement along the y axis
+        else {
+            velocity.x = 0;
+        }
+
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::W)) {
-            velosity.y = -1;
+            velocity.y = -1;
         }
         else if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) {
-            velosity.y = 1;
+            velocity.y = 1;
         }
-        else
-            velosity.y = 0;
-        // rotation of unit
+        else {
+            velocity.y = 0;
+        }
+
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left)) {
             player.RotatePlayer(-angle);
         }
         else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right)) {
             player.RotatePlayer(angle);
         }
-        player.MovePlayer(velosity.x, velosity.y);
-        //sf::Vector2f ray_coords(player.GetPosition().x + naxod(player, s, 0), player.GetPosition().y - cos((player.GetAngle() + 0) * 3.14159 / 180) * s);
-        window.clear(sf::Color::Black);
-        window_3d.clear(sf::Color::Black);
-        for (int i = -50; i <= 50; i ++){
-            sf::Vector2f ray_coords(player.GetPosition().x + naxod(player, s, i), player.GetPosition().y - cos(find_angle(player.GetAngle() + i) * 3.14159 / 180) * s);
-            //printf("%f %f \n", ray_coords.x, ray_coords.y);
-            double x1 = 150, y1 = 150, x2 = 400, y2 = 400, x3 = player.GetPosition().x, y3 = player.GetPosition().y, x4 = ray_coords.x, y4 = ray_coords.y;
-            double a1, a2, b1, b2, c1, c2;
-            a1 = y1 - y2;
-            b1 = x2 - x1;
-            c1 = x1 * y2 - x2 * y1;
-            a2 = y3 - y4;
-            b2 = x4 - x3;
-            c2 = x3 * y4 - x4 * y3;
-            intersect(a1, a2, b1, b2, c1, c2, x, y);
-            
+        double xx = velocity.x * cos(anglel(player.GetAngle())) + velocity.y * sin(anglel(player.GetAngle()));
+        double yy = velocity.y * cos(anglel(player.GetAngle())) - velocity.x * sin(anglel(player.GetAngle()));
+        bool flag = true;
+        //printf("%f, %f     (%f, %f), (%f, %f) \n", player.GetPosition().x, player.GetPosition().y);
+        for (auto& wall : walls) {
 
-            if (check(player, ray_coords, x, y)) {
-                if (lenght(ray_coords.x, ray_coords.y, player) >= lenght(x, y, player))
-                    ray_coords = sf::Vector2f(float(x), float(y));
+            if (wall.pointToSegmentDistance(player.GetPosition().x + xx, player.GetPosition().y + yy) < 2) {
+                printf("%f", wall.pointToSegmentDistance(player.GetPosition().x + xx, player.GetPosition().y + yy));
+                flag = false;
+                break;
             }
-            //printf("%f %f \n", player.GetAngle() + i);
-            sf::Vertex line[] =
-            {
+        }
+        if (flag) {
+           
+            player.MovePlayer(xx, yy);
+        }
+
+        // Перебор лучей для отрисовки
+        for (int i = -50; i <= 50; i++) {
+            sf::Vector2f ray_coords(player.GetPosition().x + naxod(player, s, i), player.GetPosition().y - cos(find_angle(player.GetAngle() + i) * 3.14159 / 180) * s);
+            sf::Vector2f intersection;
+
+            // Проверка пересечений с каждой стеной
+            for (auto& wall : walls) {
+                if (intersect_segments(player.GetPosition(), ray_coords, wall.first, wall.second, intersection)) {
+                    if (lenght(ray_coords.x, ray_coords.y, player) >= lenght(intersection.x, intersection.y, player)) {
+                        ray_coords = intersection; // Обновляем координаты луча
+                    }
+                }
+            }
+
+            // Отрисовка луча
+            sf::Vertex line[] = {
                 sf::Vertex(player.GetPosition()),
                 sf::Vertex(ray_coords)
-
             };
-            //production of a rectangles (3d)
-            printf("####  %f  #####", find_len_rect(player, ray_coords, s));
+
+            // Отрисовка 3D прямоугольников (стен)
             if (find_len_rect(player, ray_coords, s)) {
-                FenceRect.setSize(sf::Vector2f(14, 100.f * s / find_len_rect(player, ray_coords, s) ));
-                FenceRect.setPosition(sf::Vector2f(400.f +  14 * i , 100.f));
+                FenceRect.setSize(sf::Vector2f(14, 100.f * s / find_len_rect(player, ray_coords, s)));
+                FenceRect.setPosition(sf::Vector2f(400.f + 14 * i, 100.f));
                 int color = 255 - 250 * find_len_rect(player, ray_coords, s) / s;
                 FenceRect.setFillColor(sf::Color(color, color, color));
-                //FenceRect.getOrigin(sf::Vector2));
                 window_3d.draw(FenceRect);
             }
-            
-           
 
-
-
-            //drawing the rays
             window.draw(line, 2, sf::Lines);
         }
-        //abs(window, player, ray_coords);
 
-        //absc(window, player, ray_coords);
-        //window.draw(line, 2, sf::Lines);
-        printf("-----------------------------------------------------------------------------------------------------------------------\n");
-         // draw 
         player.DrawPlayer(window);
-        //for (sf::VertexArray ray : rays) {
-         //   window.draw(ray);
-        //}
-        window.draw(fence, 2, sf::Lines);
-        window.draw(fence1, 2, sf::Lines);
-        // end the current frame
+
+        // Отображение всех стен лабиринта
+        for (auto& wall : walls) {
+            sf::VertexArray wall_line(sf::Lines, 2);
+            wall_line[0].position = wall.first;
+            wall_line[1].position = wall.second;
+            window.draw(wall_line);
+        }
+
         window_3d.display();
         window.display();
     }
