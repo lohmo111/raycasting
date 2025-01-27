@@ -1,7 +1,10 @@
 #include <SFML/Graphics.hpp>
+#include <iostream>
 #include "Player.h"
 #include "Wall.h"
+#include "Finish.h"
 #include <list>
+#include <string>
 #include <stdio.h>
 #include <math.h>
 
@@ -94,6 +97,57 @@ float anglel(float ang) {
     return ang * 3.14159265 / 180;
 }
 
+
+void endGame(sf::RenderWindow& window, const std::string& message) {
+    // Создаем черный фон
+    sf::RectangleShape background(sf::Vector2f(window.getSize().x, window.getSize().y));
+    background.setFillColor(sf::Color::Black);
+
+    // Настраиваем текст для титров
+    sf::Font font;
+    if (!font.loadFromFile("ArialBlack.ttf")) { // Загрузите корректный путь к шрифту
+        std::cout << "Не удалось загрузить шрифт arial.ttf" << std::endl;
+        return;
+    }
+
+    sf::Text endText;
+    endText.setFont(font);
+    endText.setString(message);
+    endText.setCharacterSize(50); // Размер текста
+    endText.setFillColor(sf::Color::White);
+    endText.setStyle(sf::Text::Bold);
+
+    // Центрируем текст на экране
+    sf::FloatRect textBounds = endText.getLocalBounds();
+    endText.setOrigin(textBounds.width / 2, textBounds.height / 2);
+    endText.setPosition(window.getSize().x / 2, window.getSize().y / 2);
+
+    // Главный цикл для отображения титров
+    sf::Clock clock;
+    bool isRunning = true;
+    while (isRunning) {
+        sf::Event event;
+        while (window.pollEvent(event)) {
+            if (event.type == sf::Event::Closed) {
+                isRunning = false;
+                window.close();
+            }
+        }
+
+        // Если прошло 5 секунд, завершаем цикл
+        if (clock.getElapsedTime().asSeconds() > 5) {
+            isRunning = false;
+        }
+
+        // Рисуем черный экран и текст
+        window.clear();
+        window.draw(background);
+        window.draw(endText);
+        window.display();
+    }
+}
+
+
 int main() {
     // Создаем окно
     sf::RenderWindow window(sf::VideoMode(900, 900), "My window");
@@ -105,6 +159,7 @@ int main() {
     // Инициализация игрока
     Player player;
     sf::RectangleShape FenceRect;
+    Finish finish(520, 602, 78, 96);
 
     // Инициализация новых переменных и контейнеров
     sf::Vector2f velocity(0, 0);
@@ -116,6 +171,10 @@ int main() {
     //std::vector<std::pair<sf::Vector2f, sf::Vector2f>> walls = generate_maze(800, 600, 40);
     std::vector<Wall> walls = {
         // Внешние границы лабиринта
+        Wall({520, 602}, {598, 602}),   // Верхняя граница
+        Wall({598, 602}, {598, 698}),   // Левая граница
+        Wall({598, 698}, {520, 698}), // Правая граница
+
         Wall({50, 50}, {750, 50}),   // Верхняя граница
         Wall({50, 50}, {50, 750}),   // Левая граница
         Wall({750, 50}, {750, 750}), // Правая граница
@@ -188,11 +247,11 @@ int main() {
         double xx = velocity.x * cos(anglel(player.GetAngle())) + velocity.y * sin(anglel(player.GetAngle()));
         double yy = velocity.y * cos(anglel(player.GetAngle())) - velocity.x * sin(anglel(player.GetAngle()));
         bool flag = true;
-        //printf("%f, %f     (%f, %f), (%f, %f) \n", player.GetPosition().x, player.GetPosition().y);
+
         for (auto& wall : walls) {
 
             if (wall.pointToSegmentDistance(player.GetPosition().x + xx, player.GetPosition().y + yy) < 2) {
-                printf("%f", wall.pointToSegmentDistance(player.GetPosition().x + xx, player.GetPosition().y + yy));
+                //printf("%f", wall.pointToSegmentDistance(player.GetPosition().x + xx, player.GetPosition().y + yy));
                 flag = false;
                 break;
             }
@@ -201,7 +260,10 @@ int main() {
            
             player.MovePlayer(xx, yy);
         }
-
+        if (finish.isPlayerOnFinish(player.GetPosition().x, player.GetPosition().y)) {
+            endGame(window_3d, "Congratulations! You won!");
+            break; 
+        }
         // Перебор лучей для отрисовки
         for (int i = -50; i <= 50; i++) {
             sf::Vector2f ray_coords(player.GetPosition().x + naxod(player, s, i), player.GetPosition().y - cos(find_angle(player.GetAngle() + i) * 3.14159 / 180) * s);
@@ -228,6 +290,9 @@ int main() {
                 FenceRect.setPosition(sf::Vector2f(400.f + 14 * i, 100.f));
                 int color = 255 - 250 * find_len_rect(player, ray_coords, s) / s;
                 FenceRect.setFillColor(sf::Color(color, color, color));
+                if (finish.isPlayerOnFinish(ray_coords.x, ray_coords.y)){
+                    FenceRect.setFillColor(sf::Color(0, color, 0));
+                }
                 window_3d.draw(FenceRect);
             }
 
@@ -235,7 +300,7 @@ int main() {
         }
 
         player.DrawPlayer(window);
-
+        finish.draw(window);
         // Отображение всех стен лабиринта
         for (auto& wall : walls) {
             sf::VertexArray wall_line(sf::Lines, 2);
