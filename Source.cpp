@@ -164,8 +164,9 @@ int main() {
     // Инициализация новых переменных и контейнеров
     sf::Vector2f velocity(0, 0);
     float s = 300.f;
-    float angle = 2.f;
+    float angle = 1.f;
     double x = 0, y = 0;
+    double speed = 0.3;
 
     // Генерация лабиринта
     //std::vector<std::pair<sf::Vector2f, sf::Vector2f>> walls = generate_maze(800, 600, 40);
@@ -219,20 +220,20 @@ int main() {
 
         // Движение и поворот
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) {
-            velocity.x = -1;
+            velocity.x = -speed;
         }
         else if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) {
-            velocity.x = 1;
+            velocity.x = speed;
         }
         else {
             velocity.x = 0;
         }
 
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::W)) {
-            velocity.y = -1;
+            velocity.y = -speed;
         }
         else if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) {
-            velocity.y = 1;
+            velocity.y = speed;
         }
         else {
             velocity.y = 0;
@@ -310,7 +311,8 @@ int main() {
         }
 
         window_3d.display();
-        window.display();
+        //window.display();
+        window.close();
     }
 
     return 0;
